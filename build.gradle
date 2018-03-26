@@ -1,0 +1,147 @@
+/*
+ * Copyright (c) 2017, Civitas Learning Incorporated.
+ * All Rights Reserved.
+ *
+ * This software is protected by U.S. Copyright Law and International Treaties.
+ * Unauthorized use, duplication, reverse engineering, any form of redistribution,
+ * or use in part or in whole other than by prior, express, printed and signed license
+ * for use is subject to civil and criminal prosecution.
+ */
+
+buildscript {
+  repositories {
+    mavenLocal()
+
+    maven {url gradle.ext.civitasMavenRepo}
+  }
+  dependencies {
+    // Avro dependency first to force the version
+    classpath group: 'org.apache.avro', name: 'avro-compiler', version: property('avro.version')
+
+    // Plugin Dependencies
+    classpath group: 'com.bmuschko', name: 'gradle-docker-plugin', version: property('gradle-docker-plugin.version')
+    classpath group: 'com.civitaslearning.platform', name: 'platform-gradle-plugin',
+        version: property('platform-gradle-plugin.version')
+    classpath group: "com.commercehub.gradle.plugin", name: "gradle-avro-plugin",
+        version: property('gradle-avro-plugin.version')
+    classpath group: 'org.ajoberstar', name: 'gradle-git', version: property('gradle-git.version')
+    classpath group: 'gradle.plugin.com.gorylenko.gradle-git-properties', name: 'gradle-git-properties',
+        version: property('gradle-git-properties.version')
+    classpath group: 'org.springframework.boot', name: 'spring-boot-gradle-plugin',
+        version: property('spring-boot.version')
+    classpath group: 'io.spring.gradle', name: 'dependency-management-plugin',
+        version: property('spring-dependency-management.version')
+    classpath group: 'org.whitesource', name: 'whitesource-gradle-plugin',
+        version: property('whitesource-gradle-plugin.version')
+  }
+}
+
+repositories {
+  mavenLocal()
+
+  maven {url gradle.ext.civitasMavenRepo}
+}
+
+// Determines version for release; apply early to ensure project.version is available.
+apply plugin: 'org.ajoberstar.grgit'
+apply plugin: 'org.ajoberstar.release-base'
+
+// Standard Platform Gradle Plugin
+apply plugin: 'com.civitaslearning.platform-gradle'
+
+apply plugin: 'application'
+apply plugin: 'checkstyle'
+apply plugin: 'findbugs'
+apply plugin: 'jacoco'
+apply plugin: 'maven-publish'
+apply plugin: "com.commercehub.gradle.plugin.avro"
+apply plugin: 'whitesource'
+
+// Spring dependency management and Boot
+apply plugin: 'io.spring.dependency-management'
+apply plugin: 'org.springframework.boot'
+
+apply plugin: 'com.bmuschko.docker-remote-api'
+
+// These plugins require a normal checkout with a .git directory (missing in alternate work trees)
+if (file("${rootDir}/.git").isDirectory()) {
+  // Generate git.properties
+  apply plugin: 'com.gorylenko.gradle-git-properties'
+}
+
+group 'com.civitaslearning.platform'
+description 'Platform Controller Library'
+
+civitasPlatform {
+  publishing {
+    name 'Kafka Topic Provisioning Service'
+    inceptionYear 2017
+  }
+  jacoco {
+    //TODO re-enable this once we have a defined method to exclude avro generated java
+    requireMinimums false
+  }
+}
+
+dependencyManagement {
+  imports {
+    // Import the Platform Commons Confluent BOM to make sure to get the right Confluent dependencies.
+    //   Note that this will fail when this service is part of a composite build with the platform-commons-confluent
+    //   project if the platform-commons-confluent project has not been built (see its build.gradle).
+    mavenBom "com.civitaslearning.platform:platform-commons-confluent:${project.property('platform-commons-confluent.version')}"
+  }
+}
+
+dependencies {
+  compile group: 'com.civitaslearning.platform', name: 'platform-commons-confluent-core',
+      version: property('platform-commons-confluent.version')
+
+  // Standard Jackson configuration
+  compile group: 'com.civitaslearning.platform', name: 'platform-commons-jackson',
+      version: property('platform-commons-jackson.version')
+
+  // Use auth0 directly for JWT because they are our provider
+  compile group: 'com.auth0', name: 'java-jwt', version: property('auth0.version')
+
+  runtime group: 'com.civitaslearning.commons', name: 'civitas-commons-logging',
+      version: property('civitas-commons-logging.version')
+  // for metrics and health
+  runtime group: 'org.springframework.boot', name: 'spring-boot-starter-actuator'
+  runtime group: 'org.springframework.boot', name: 'spring-boot-starter-web'
+
+  // Add Consul at runtime because it is not needed for compiling
+  // Spring Cloud Config Consul dependencies
+  runtime group: 'org.springframework.cloud', name: 'spring-cloud-commons'
+  runtime group: 'org.springframework.cloud', name: 'spring-cloud-context'
+  runtime group: 'org.springframework.cloud', name: 'spring-cloud-consul-core'
+  runtime group: 'org.springframework.cloud', name: 'spring-cloud-consul-config'
+  // Consul client
+  runtime group: 'com.ecwid.consul', name: 'consul-api'
+
+  // Optional extras for pausing until Consul is available on startup
+  runtime group: 'org.springframework.boot', name: 'spring-boot-starter-aop'
+  runtime group: 'org.springframework.retry', name: 'spring-retry'
+
+  // Spring Boot test support
+  testCompile group: 'org.springframework.boot', name: 'spring-boot-starter-test'
+
+  testCompile group: 'com.civitaslearning.platform', name: 'platform-commons-confluent-testing',
+      version: property('platform-commons-confluent.version')
+}
+
+avro {
+  createSetters = false
+  fieldVisibility = 'PRIVATE'
+  if ("/".equals(projectDir.toPath().getFileSystem().getSeparator())) {
+    // Use patched templates to remove compiler warnings
+    // See: https://issues.apache.org/jira/browse/AVRO-1047
+    // See: https://github.com/apache/avro/pull/250
+    templateDirectory = "${projectDir}/src/main/avro-templates/"
+  }
+}
+
+bootRun {
+  environment SPRING_PROFILES_ACTIVE: environment.SPRING_PROFILES_ACTIVE ?: "development"
+}
+
+check.dependsOn(integrationTest)
