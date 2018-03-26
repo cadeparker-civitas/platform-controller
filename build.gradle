@@ -27,12 +27,8 @@ buildscript {
     classpath group: 'org.ajoberstar', name: 'gradle-git', version: property('gradle-git.version')
     classpath group: 'gradle.plugin.com.gorylenko.gradle-git-properties', name: 'gradle-git-properties',
         version: property('gradle-git-properties.version')
-    classpath group: 'org.springframework.boot', name: 'spring-boot-gradle-plugin',
-        version: property('spring-boot.version')
     classpath group: 'io.spring.gradle', name: 'dependency-management-plugin',
         version: property('spring-dependency-management.version')
-    classpath group: 'org.whitesource', name: 'whitesource-gradle-plugin',
-        version: property('whitesource-gradle-plugin.version')
   }
 }
 
@@ -49,17 +45,14 @@ apply plugin: 'org.ajoberstar.release-base'
 // Standard Platform Gradle Plugin
 apply plugin: 'com.civitaslearning.platform-gradle'
 
-apply plugin: 'application'
 apply plugin: 'checkstyle'
 apply plugin: 'findbugs'
 apply plugin: 'jacoco'
 apply plugin: 'maven-publish'
 apply plugin: "com.commercehub.gradle.plugin.avro"
-apply plugin: 'whitesource'
 
 // Spring dependency management and Boot
 apply plugin: 'io.spring.dependency-management'
-apply plugin: 'org.springframework.boot'
 
 apply plugin: 'com.bmuschko.docker-remote-api'
 
@@ -74,7 +67,7 @@ description 'Platform Controller Library'
 
 civitasPlatform {
   publishing {
-    name 'Kafka Topic Provisioning Service'
+    name 'Platform Controller Library'
     inceptionYear 2017
   }
   jacoco {
@@ -105,25 +98,6 @@ dependencies {
 
   runtime group: 'com.civitaslearning.commons', name: 'civitas-commons-logging',
       version: property('civitas-commons-logging.version')
-  // for metrics and health
-  runtime group: 'org.springframework.boot', name: 'spring-boot-starter-actuator'
-  runtime group: 'org.springframework.boot', name: 'spring-boot-starter-web'
-
-  // Add Consul at runtime because it is not needed for compiling
-  // Spring Cloud Config Consul dependencies
-  runtime group: 'org.springframework.cloud', name: 'spring-cloud-commons'
-  runtime group: 'org.springframework.cloud', name: 'spring-cloud-context'
-  runtime group: 'org.springframework.cloud', name: 'spring-cloud-consul-core'
-  runtime group: 'org.springframework.cloud', name: 'spring-cloud-consul-config'
-  // Consul client
-  runtime group: 'com.ecwid.consul', name: 'consul-api'
-
-  // Optional extras for pausing until Consul is available on startup
-  runtime group: 'org.springframework.boot', name: 'spring-boot-starter-aop'
-  runtime group: 'org.springframework.retry', name: 'spring-retry'
-
-  // Spring Boot test support
-  testCompile group: 'org.springframework.boot', name: 'spring-boot-starter-test'
 
   testCompile group: 'com.civitaslearning.platform', name: 'platform-commons-confluent-testing',
       version: property('platform-commons-confluent.version')
@@ -139,9 +113,3 @@ avro {
     templateDirectory = "${projectDir}/src/main/avro-templates/"
   }
 }
-
-bootRun {
-  environment SPRING_PROFILES_ACTIVE: environment.SPRING_PROFILES_ACTIVE ?: "development"
-}
-
-check.dependsOn(integrationTest)
